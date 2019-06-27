@@ -13,5 +13,9 @@ export default new VueRouter({
     path: '/helloGd',
     name: 'helloGd',
     component: () => import('@/views/demo/HelloAMap')
+  }, {
+    path: '/test',
+    name: 'test',
+    component: () => import('@/views/demo/Test')
   }]
 })
