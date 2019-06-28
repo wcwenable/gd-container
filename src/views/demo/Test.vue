@@ -6,17 +6,20 @@
         </div>
 
         <div class='input-card'>
+            <a :disabled="!isExistCurrentNode" :class="btnClass" @click="handleEraseOverlays">
+              <img v-show="isExistCurrentNode" src="@/assets/track/addNodeSmallBlue.png" />
+              <img v-show="!isExistCurrentNode" src="@/assets/track/addNodeSmallGray.png" />添加节点
+            </a>
 
-                <a class="btn" @click="handleEraseOverlays" :style="{margin:0}">添加节点</a>
+            <a :class="btnClass" @click="handleEraseOverlays">
+              <img v-show="isExistCurrentNode" src="@/assets/track/addSpecialFeeSmallBlue.png" />
+              <img v-show="!isExistCurrentNode" src="@/assets/track/addSpecialFeeSmallGray.png" />添加特殊费
+            </a>
 
-                <el-divider direction="vertical"></el-divider>
-
-                <a class="btn" @click="handleEraseOverlays">添加特殊费</a>
-
-                <el-divider direction="vertical"></el-divider>
-
-                <a class="btn" @click="handleEraseOverlays">添加异常</a>
-
+            <a :class="btnClass" @click="handleEraseOverlays">
+              <img v-show="isExistCurrentNode" src="@/assets/track/addExceptionSmallBlue.png" />
+              <img v-show="!isExistCurrentNode" src="@/assets/track/addExceptionSmallGray.png" />添加异常
+            </a>
         </div>
 
     </div>
@@ -80,6 +83,18 @@ export default {
         }]
       }
       ]
+    }
+  },
+  computed: {
+    isExistCurrentNode () {
+      return false
+    },
+    btnClass () {
+      return {
+        enabledBtn: this.isExistCurrentNode,
+        disabledBtn: !this.isExistCurrentNode,
+        rightLine: true
+      }
     }
   },
   mounted () {
@@ -250,7 +265,7 @@ export default {
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
+<style lang="scss">
 /* * {
     margin: 0;
     padding: 0;
@@ -282,19 +297,40 @@ export default {
     border-radius: 4px;
 }
 
-.btn {
-    width: 48px;
+@mixin btn-common {
+    width: auto;
     height: 17px;
     font-size: 12px;
     font-family: PingFang-SC-Medium;
     font-weight: 500;
-    color: rgba(0, 0, 0, 0.65);
     line-height: 17px;
+    padding: 0 5px;
 }
+
+.disabledBtn {
+    @include btn-common;
+    color: rgba(0, 0, 0, 0.65);
+}
+
+.enabledBtn {
+    @include btn-common;
+    color: rgba(24, 144, 255, 1);
+}
+
+.rightLine {
+    border-right: 1px dashed #CCCCCC;
+}
+
 .line {
-height: 17px;
-margin-top: 1px;
-border-top-style: dashed;
-border-top-color: #CCCCCC;
+    height: 17px;
+    margin-top: 1px;
+    border-top-style: dashed;
+    border-top-color: #CCCCCC;
+}
+
+img {
+    vertical-align: middle;
+    margin: 0 5px;
+    padding-bottom: 3px;
 }
 </style>

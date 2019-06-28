@@ -11,14 +11,22 @@ export default {
   props: {
     msg: String
   },
+  created () {
+    this.$axios.get('/api/data1').then((res) => {
+      console.log(res.data)
+    })
+    this.$axios.get('/api/data').then((res) => {
+      console.log(res.data)
+    })
+  },
   mounted () {
-    var map = new AMap.Map('container', {
+    var map = new window.AMap.Map('container', {
       zoom: 11, // 级别
       center: [116.397428, 39.90923], // 中心点坐标
       viewMode: '3D'// 使用3D视图
     })
     console.log('Amap515', map)
-    AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
+    window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
       var lngLats = getGridLngLats(map.getCenter(), 4, 4)
 
       let tempSm = new SimpleMarker({
@@ -69,8 +77,8 @@ export default {
       })
     })
 
-    AMap.plugin(['AMap.ToolBar'], function () {
-      map.addControl(new AMap.ToolBar({
+    window.AMap.plugin(['AMap.ToolBar'], function () {
+      map.addControl(new window.AMap.ToolBar({
         map: map
       }))
     })
@@ -105,7 +113,7 @@ export default {
 
           var y = startY + (r - (rowNum - 1) / 2) * (cellY)
 
-          lngLats.push(map.pixelToLngLat(new AMap.Pixel(x, y)))
+          lngLats.push(map.pixelToLngLat(new window.AMap.Pixel(x, y)))
 
           if (lngLats.length >= size) {
             break
