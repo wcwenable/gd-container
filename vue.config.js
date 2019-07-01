@@ -107,13 +107,13 @@ module.exports = {
   devServer: {
     port: 9558, // can be overwritten by process.env.PORT, if port is in use, a free one will be determined
     proxy: {
-      // 权限
-      '/api/authcenter': {
-        target: 'http://tms-dev.dj.com/api',
+      // track
+      '/api/track': {
+        target: 'https://www.easy-mock.com/mock/5d15c6a27dc63062f26d8249/track',
         ws: false,
         changeOrigin: true,
         pathRewrite: {
-          '^/api/authcenter': '/authcenter'
+          '^/api/track': '/'
         }
       },
       // 字典

@@ -17,5 +17,9 @@ export default new VueRouter({
     path: '/test',
     name: 'test',
     component: () => import('@/views/demo/Test')
+  }, {
+    path: '/ll',
+    name: 'll',
+    component: () => import('@/views/demo/LabelsLayerDemo')
   }]
 })
