@@ -366,6 +366,12 @@ export default {
           that.displayInfoWindow(that, lnglat)
         })
       })
+      !that.isNeedToCallPlanning && window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
+        // 对于已送达的情况，绘制起止点图钉
+        const startMarker = that.getCurrentStartMarker(that, SimpleMarker)
+        const endMarker = that.getCurrentEndMarker(that, SimpleMarker)
+        that.map.setFitView([startMarker, endMarker])
+      })
     },
     /**
        * pointType: (1: 起点，2：中间点，3：终点)
@@ -427,23 +433,50 @@ export default {
       const currentClass = isCurrent ? 'labelCommon current' : 'labelCommon'
       switch (contentType) {
         case 1:
-          return `<div class=${currentClass}><span>提货地址：${this.getFormatValue(businessData.sdAddress)}</span><br><span>要求提货时间：${this.getFormatValue(businessData.pickupTime)}</span><br><span>实际提货时间：${this.getFormatValue(businessData.actualPickupTime)}</span></div>`
+          return `<div class='${currentClass}'><span>提货地址：${this.getFormatValue(businessData.sdAddress || businessData.detailAddress)}</span><br><span>要求提货时间：${this.getFormatValue(businessData.pickupTime)}</span><br><span>实际提货时间：${this.getFormatValue(businessData.actualPickupTime)}</span></div>`
         case 2:
-          return `<div class=${currentClass}><span>在途位置：${this.getFormatValue(businessData.detailAddress)}</span><span>提交人：${this.getFormatValue(businessData.createAccountName)}</span><br><span>提交时间：${this.getFormatValue(businessData.createDate)}</span><br><span>提交来源：${this.getFormatValue(businessData.sourceTypeName)}</span></div>`
+          return `<div class='${currentClass}'><span>在途位置：${this.getFormatValue(businessData.detailAddress)}</span><span>提交人：${this.getFormatValue(businessData.createAccountName)}</span><br><span>提交时间：${this.getFormatValue(businessData.createDate)}</span><br><span>提交来源：${this.getFormatValue(businessData.sourceTypeName)}</span></div>`
         case 3:
-          return `<div class=${currentClass}><span>送达地址：${this.getFormatValue(businessData.rvAddress)}</span><br><span>要求送达时间：${this.getFormatValue(businessData.arrivalTime)}</span><br><span>实际送达时间：${this.getFormatValue(businessData.actualArriveDateTime)}</span></div>`
+          return `<div class='${currentClass}'><span>送达地址：${this.getFormatValue(businessData.rvAddress || businessData.detailAddress)}</span><br><span>要求送达时间：${this.getFormatValue(businessData.arrivalTime)}</span><br><span>实际送达时间：${this.getFormatValue(businessData.actualArriveDateTime)}</span></div>`
         default:
           alert('非法的内容类型！')
       }
+    },
+    getCurrentStartMarker (context, SimpleMarker) {
+      const startPointLocation = context.currentWaybillTrailLngLats[0].points[0]
+      const startPointBusinessData = startPointLocation.businessData
+      const startMarker = new SimpleMarker(context.getMarkerOptions(context, startPointLocation.lnglat, 1, startPointBusinessData.isTransitForLongLatLocation, startPointBusinessData.isOperationToDelay, startPointBusinessData.isOperationDelayed))
+      startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(1, true, startPointBusinessData.businessInfo)))
+      return startMarker
+    },
+    getCurrentEndMarker (context, SimpleMarker) {
+      let points = []
+      if (context.isNeedToCallPlanning) {
+        points = context.currentWaybillTrailLngLats[1].points
+      } else if (context.isNeedToCallPainting) {
+        points = context.currentWaybillTrailLngLats[0].points
+      }
+      const point = points.length && points[points.length - 1]
+      console.log('getCurrentEndMarker515', context.currentWaybillTrailLngLats, points, point)
+      const endPointLocation = point && point.lnglat
+      const endPointBusinessData = point && point.businessData
+      const endMarker = endPointBusinessData && new SimpleMarker(context.getMarkerOptions(context, endPointLocation.lnglat, 3, endPointBusinessData.isTransitForLongLatLocation, endPointBusinessData.isOperationToDelay, endPointBusinessData.isOperationDelayed))
+      endMarker && endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(3, true, endPointBusinessData.businessInfo)))
+      return endMarker
     },
     drawRoute (route) {
       const that = this
       window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
         const path = that.parseRouteToPath(route)
-        const startMarker = new SimpleMarker(that.getMarkerOptions(that, that.currentWaybillTrailLngLats[0].points[0].lnglat, 1, true, true, false))
-        startMarker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(1, true, {})))
-        const endMarker = new SimpleMarker(that.getMarkerOptions(that, path[path.length - 1], 3, true, false, true))
-        endMarker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(3, true, {})))
+        console.log('that.currentWaybillTrailLngLats515, path', that.currentWaybillTrailLngLats, path)
+        // const startPointLocation = that.currentWaybillTrailLngLats[0].points[0]
+        // const startPointBusinessData = startPointLocation.businessData
+        // const startMarker = new SimpleMarker(that.getMarkerOptions(that, startPointLocation.lnglat, 1, startPointBusinessData.isTransitForLongLatLocation, startPointBusinessData.isOperationToDelay, startPointBusinessData.isOperationDelayed))
+        // startMarker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(1, true, startPointBusinessData.businessInfo)))
+        const startMarker = that.getCurrentStartMarker(that, SimpleMarker)
+        const endMarker = that.getCurrentEndMarker(that, SimpleMarker)
+        // const endMarker = new SimpleMarker(that.getMarkerOptions(that, path[path.length - 1], 3, true, false, true))
+        // endMarker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(3, true, {})))
         // that.displayInfoWindow(that, endMarker)
         // const middleMarker = new window.AMap.Marker(that.getMarkerOptions(that, [101.135432, 42.930601], 2, false, false, false))
         // that.displayInfoWindow(that, middleMarker)
