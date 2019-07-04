@@ -43,7 +43,7 @@ export default {
       })
     },
     handleResetBtnClick () {
-      this.currentDispatch = null
+      // this.currentDispatch = null
       this.currentDispatchedWaybillId = null
     }
   }

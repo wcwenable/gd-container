@@ -173,66 +173,71 @@ export default {
   },
   methods: {
     handleDispatchWaybillChange () {
-      this.isExistCurrentNode && this.$http.get('/api/track/getLocationsByDispatchWaybillId').then((res) => {
-        console.log('getLocationsByDispatchWaybillId》res515', res)
-        const resData = res.body.data
-        this.currentWaybillTrailLngLats = []
+      if (this.isExistCurrentNode) {
+        this.$http.get('/api/track/getLocationsByDispatchWaybillId').then((res) => {
+          console.log('getLocationsByDispatchWaybillId》res515', res)
+          const resData = res.body.data
+          this.currentWaybillTrailLngLats = []
 
-        // 求currentWaybillTrailLngLats的值
-        const locations = resData && resData.locations
-        if (locations && locations.length > 1) {
-          if (resData.isArrived) {
-            const walkedRoadLinePoints = []
-            locations.forEach(locationBusinessEntity => {
-              walkedRoadLinePoints.push({
-                name: locationBusinessEntity.businessInfo.detailAddress,
-                lnglat: locationBusinessEntity.longLatLocation,
-                businessData: locationBusinessEntity
-              })
-            })
-            this.currentWaybillTrailLngLats.push(
-              {
-                name: '已走线路',
-                points: walkedRoadLinePoints
-              }
-            )
-          } else {
-            const walkedRoadLinePoints = []
-            const toWalkRoadLinePoints = []
-            locations.forEach((locationBusinessEntity, index) => {
-              (index !== locations.length - 1) && walkedRoadLinePoints.push({
-                name: locationBusinessEntity.businessInfo.detailAddress,
-                lnglat: locationBusinessEntity.longLatLocation,
-                businessData: locationBusinessEntity
-              })
-
-              if ((index === locations.length - 2) || (index === locations.length - 1)) {
-                toWalkRoadLinePoints.push({
+          // 求currentWaybillTrailLngLats的值
+          const locations = resData && resData.locations
+          if (locations && locations.length > 1) {
+            if (resData.isArrived) {
+              const walkedRoadLinePoints = []
+              locations.forEach(locationBusinessEntity => {
+                walkedRoadLinePoints.push({
                   name: locationBusinessEntity.businessInfo.detailAddress,
                   lnglat: locationBusinessEntity.longLatLocation,
                   businessData: locationBusinessEntity
                 })
-              }
-            })
-            this.currentWaybillTrailLngLats.push(
-              {
-                name: '已走线路',
-                points: walkedRoadLinePoints
-              }
-            )
-            this.currentWaybillTrailLngLats.push(
-              {
-                name: '未走线路',
-                points: toWalkRoadLinePoints
-              }
-            )
+              })
+              this.currentWaybillTrailLngLats.push(
+                {
+                  name: '已走线路',
+                  points: walkedRoadLinePoints
+                }
+              )
+            } else {
+              const walkedRoadLinePoints = []
+              const toWalkRoadLinePoints = []
+              locations.forEach((locationBusinessEntity, index) => {
+                (index !== locations.length - 1) && walkedRoadLinePoints.push({
+                  name: locationBusinessEntity.businessInfo.detailAddress,
+                  lnglat: locationBusinessEntity.longLatLocation,
+                  businessData: locationBusinessEntity
+                })
+
+                if ((index === locations.length - 2) || (index === locations.length - 1)) {
+                  toWalkRoadLinePoints.push({
+                    name: locationBusinessEntity.businessInfo.detailAddress,
+                    lnglat: locationBusinessEntity.longLatLocation,
+                    businessData: locationBusinessEntity
+                  })
+                }
+              })
+              this.currentWaybillTrailLngLats.push(
+                {
+                  name: '已走线路',
+                  points: walkedRoadLinePoints
+                }
+              )
+              this.currentWaybillTrailLngLats.push(
+                {
+                  name: '未走线路',
+                  points: toWalkRoadLinePoints
+                }
+              )
+            }
           }
-        }
-        console.log('this.currentWaybillTrailLngLats515', this.currentWaybillTrailLngLats)
-        this.initProcess()
-      }, (err) => {
-        console.log('getLocationsByDispatchWaybillId》err515', err)
-      })
+          console.log('this.currentWaybillTrailLngLats515', this.currentWaybillTrailLngLats)
+          this.initProcess()
+        }, (err) => {
+          console.log('getLocationsByDispatchWaybillId》err515', err)
+        })
+      } else {
+        this.currentWaybillTrailLngLats = []
+        this.handleEraseOverlays()
+      }
     },
     batchAddMarkers (context, businessEntityList, processFn) {
       window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {

@@ -15,6 +15,7 @@
         <img v-show="isExistCurrentNode" src="@/assets/track/addExceptionSmallBlue.png" />
         <img v-show="!isExistCurrentNode" src="@/assets/track/addExceptionSmallGray.png" />添加异常
       </a>
+      <el-button @click="handleEraseOverlays">清除地图覆盖物</el-button>
     </div>
   </div>
 </template>
@@ -148,31 +149,50 @@ export default {
     dispatchBusinessEntity (newVal) {
       console.log('dispatchBusinessEntity515', newVal)
       this.currentDispatch = newVal
-      this.handleEraseOverlays()
-      if (this.isExistCurrentDispatch) {
-        this.batchAddMarkers(this, this.currentDispatch.dispatchedWaybills, (context, waybillBusinessEntity, SimpleMarker) => {
-          if (context.currentDispatchedWaybillId && context.currentDispatchedWaybillId === waybillBusinessEntity.dispatchWaybillId) {
-            return []
-          }
-          const startMarker = new SimpleMarker(context.getMarkerOptions(context, waybillBusinessEntity.startLocation, 1, waybillBusinessEntity.isTransitForStartLocation, waybillBusinessEntity.isDeliveryToDelay, waybillBusinessEntity.isDeliveryDelayed))
-          startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(1, false, waybillBusinessEntity)))
-          const endMarker = new SimpleMarker(context.getMarkerOptions(context, waybillBusinessEntity.endLocation, 3, waybillBusinessEntity.isTransitForEndLocation, waybillBusinessEntity.isArriveToDelay, waybillBusinessEntity.isArriveDelayed))
-          endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(3, false, waybillBusinessEntity)))
-          return [startMarker, endMarker]
-        })
-      }
-      this.initProcess()
+      this.handleCurrentDispatchChange()
     },
     // 处理调度运单改变事件
     dispatchWaybillId (newVal) {
       console.log('dispatchWaybillId515', newVal)
       this.currentDispatchedWaybillId = newVal
-      this.handleEraseOverlays()
-      this.handleDispatchWaybillChange()
+      // this.handleDispatchWaybillChange()
+      !this.isExistCurrentNode && this.initProcess()
     }
   },
   methods: {
+    handleCurrentDispatchChange () {
+      this.handleEraseOverlays()
+      const oldCurrentDispatchWaybillId = this.currentDispatchedWaybillId
+      if (this.isExistCurrentDispatch) {
+        const bRet = this.batchAddMarkers(this, this.currentDispatch.dispatchedWaybills, oldCurrentDispatchWaybillId, (context, waybillBusinessEntity, SimpleMarker) => {
+          if (context.currentDispatchedWaybillId && context.currentDispatchedWaybillId === waybillBusinessEntity.dispatchWaybillId) {
+            return []
+          }
+          const startMarker = new SimpleMarker(context.getMarkerOptions(context, waybillBusinessEntity.startLocation, 1, waybillBusinessEntity.isTransitForStartLocation, waybillBusinessEntity.isDeliveryToDelay, waybillBusinessEntity.isDeliveryDelayed))
+          startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 1, false, waybillBusinessEntity)))
+          const endMarker = new SimpleMarker(context.getMarkerOptions(context, waybillBusinessEntity.endLocation, 3, waybillBusinessEntity.isTransitForEndLocation, waybillBusinessEntity.isArriveToDelay, waybillBusinessEntity.isArriveDelayed))
+          endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 3, false, waybillBusinessEntity)))
+          return [startMarker, endMarker]
+        })
+        bRet && this.initProcess()
+        // !bRet && this.handleCurrentDispatchChange()
+      }
+      const that = this
+      !this.isExistCurrentDispatch && this.$http.get('/api/track/getAllWaybillLocations').then((res) => {
+        console.log('getAllWaybillLocations》res515', res)
+        const locations = res.body.data.locations
+        const oldCurrentDispatchWaybillId = this.currentDispatchedWaybillId
+        !that.isExistCurrentDispatch && that.batchAddMarkers(that, locations, oldCurrentDispatchWaybillId, (context, locationBusinessEntity, SimpleMarker) => {
+          const marker = new SimpleMarker(context.getMarkerOptions(context, locationBusinessEntity.longLatLocation, locationBusinessEntity.locationType, locationBusinessEntity.isTransitForLongLatLocation, locationBusinessEntity.isOperationToDelay, locationBusinessEntity.isOperationDelayed))
+          // marker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(locationBusinessEntity.locationType, false, locationBusinessEntity)))
+          return [marker]
+        })
+      }, (err) => {
+        console.log('err515', err)
+      })
+    },
     handleDispatchWaybillChange () {
+      this.handleEraseOverlays()
       this.isExistCurrentNode && this.$http.get('/api/track/getLocationsByDispatchWaybillId').then((res) => {
         console.log('getLocationsByDispatchWaybillId》res515', res)
         const resData = res.body.data
@@ -229,20 +249,34 @@ export default {
           }
         }
         console.log('this.currentWaybillTrailLngLats515', this.currentWaybillTrailLngLats)
-        this.initProcess()
+        this.isNeedToCallPainting && this.paintingWalkedRoadLine()
+        this.isNeedToCallPlanning && this.planningRoadLine()
       }, (err) => {
         console.log('getLocationsByDispatchWaybillId》err515', err)
       })
     },
-    batchAddMarkers (context, businessEntityList, processFn) {
+    batchAddMarkers (context, businessEntityList, oldCurrentDispatchWaybillId, processFn) {
       window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
         let markers = []
-        businessEntityList.forEach(locationBusinessEntity => {
+        for (let locationBusinessEntity of businessEntityList) {
           const retMarkers = processFn(context, locationBusinessEntity, SimpleMarker)
           markers = [...markers, ...retMarkers]
-        })
+
+          // 中途检查到当前调度运单发生变化
+          if (oldCurrentDispatchWaybillId !== context.currentDispatchedWaybillId) {
+            context.isExistCurrentNode && context.initProcess()
+            if (!context.isExistCurrentNode) {
+              // debugger
+              // context.initProcess()
+              continue
+            }
+            return false
+          }
+        }
         // 调整视野达到最佳显示区域
         context.map.setFitView(markers)
+
+        return true
       })
     },
     initProcess () {
@@ -250,20 +284,8 @@ export default {
       this.map = this.map || new window.AMap.Map('container', {
         zoom: 4
       })
-      const that = this
-      !this.isExistCurrentDispatch && this.$http.get('/api/track/getAllWaybillLocations').then((res) => {
-        console.log('getAllWaybillLocations》res515', res)
-        const locations = res.body.data.locations
-        !that.isExistCurrentDispatch && that.batchAddMarkers(that, locations, (context, locationBusinessEntity, SimpleMarker) => {
-          const marker = new SimpleMarker(context.getMarkerOptions(context, locationBusinessEntity.longLatLocation, locationBusinessEntity.locationType, locationBusinessEntity.isTransitForLongLatLocation, locationBusinessEntity.isOperationToDelay, locationBusinessEntity.isOperationDelayed))
-          // marker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(locationBusinessEntity.locationType, false, locationBusinessEntity)))
-          return [marker]
-        })
-      }, (err) => {
-        console.log('err515', err)
-      })
-      this.isNeedToCallPainting && this.paintingWalkedRoadLine()
-      this.isNeedToCallPlanning && this.planningRoadLine()
+      this.handleCurrentDispatchChange()
+      this.handleDispatchWaybillChange()
     },
     handleAddNode () {
       this.$message.warning('添加节点逻辑here!')
@@ -283,10 +305,7 @@ export default {
     },
     displayInfoWindow (context, lnglat, businessData) {
       const content = []
-      // content.push("<div><img src='http://tpc.googlesyndication.com/simgad/5843493769827749134'>地址：北京市朝阳区阜通东大街6号院3号楼东北8.3公里")
-      // content.push('电话：010-64733333')
-      // content.push("<a href='https://ditu.amap.com/detail/B000A8URXB?citycode=110105'>详细信息</a></div>")
-      const contentStr = context.getMarkerLabelContent(businessData.locationType, true, businessData, true)
+      const contentStr = context.getMarkerLabelContent(context, businessData.locationType, true, businessData, true)
       content.push(contentStr)
       const infoWindow = new window.AMap.InfoWindow({
         isCustom: true, // 使用自定义窗体
@@ -333,47 +352,47 @@ export default {
     },
     paintingWalkedRoadLine () {
       const that = this
-      // window.AMapUI.load(['ui/misc/PathSimplifier', 'lib/$'], function (PathSimplifier, $) {
-      //   if (!PathSimplifier.supportCanvas) {
-      //     alert('当前环境不支持 Canvas！')
-      //     return
-      //   }
-      //   that.pathSimplifierIns = that.pathSimplifierIns || new PathSimplifier({
-      //     zIndex: 100,
-      //     // autoSetFitView:false,
-      //     map: that.map, // 所属的地图实例
-      //     getPath: function (pathData, pathIndex) {
-      //       var points = pathData.points
-      //       var lnglatList = []
-      //       console.log('pathData515', pathData, pathIndex)
-      //       for (var i = 0, len = points.length; i < len; i++) {
-      //         lnglatList.push(points[i].lnglat)
-      //       }
-      //       return lnglatList
-      //     },
-      //     getHoverTitle: function (pathData, pathIndex, pointIndex) {
-      //       console.log('')
-      //       if (pointIndex >= 0) {
-      //         // point
-      //         return pathData.name + '，' + pathData.points[pointIndex].name
-      //       }
-      //       return pathData.name + '，点数量' + pathData.points.length
-      //     },
-      //     renderOptions: that.renderOptions
-      //   })
-      //   // 设置数据
-      //   that.pathSimplifierIns.setData([that.currentWaybillTrailLngLats[0]])
-      //   // 选中路线0
-      //   that.pathSimplifierIns.setSelectedPathIndex(0)
-      //   that.pathSimplifierIns.on('pointClick', function (e, info) {
-      //     console.log('Click: ' + info.pathData.points[info.pointIndex].name, info)
-      //     const point = info.pathData.points[info.pointIndex]
-      //     that.displayInfoWindow(that, point.lnglat, point.businessData)
-      //   })
-      // })
+      window.AMapUI.load(['ui/misc/PathSimplifier', 'lib/$'], function (PathSimplifier, $) {
+        if (!PathSimplifier.supportCanvas) {
+          alert('当前环境不支持 Canvas！')
+          return
+        }
+        that.pathSimplifierIns = that.pathSimplifierIns || new PathSimplifier({
+          zIndex: 100,
+          // autoSetFitView:false,
+          map: that.map, // 所属的地图实例
+          getPath: function (pathData, pathIndex) {
+            var points = pathData.points
+            var lnglatList = []
+            console.log('pathData515', pathData, pathIndex)
+            for (var i = 0, len = points.length; i < len; i++) {
+              lnglatList.push(points[i].lnglat)
+            }
+            return lnglatList
+          },
+          getHoverTitle: function (pathData, pathIndex, pointIndex) {
+            console.log('')
+            if (pointIndex >= 0) {
+              // point
+              return pathData.name + '，' + pathData.points[pointIndex].name
+            }
+            return pathData.name + '，点数量' + pathData.points.length
+          },
+          renderOptions: that.renderOptions
+        })
+        // 设置数据
+        that.pathSimplifierIns.setData([that.currentWaybillTrailLngLats[0]])
+        // 选中路线0
+        that.pathSimplifierIns.setSelectedPathIndex(0)
+        that.pathSimplifierIns.on('pointClick', function (e, info) {
+          console.log('Click: ' + info.pathData.points[info.pointIndex].name, info)
+          const point = info.pathData.points[info.pointIndex]
+          that.displayInfoWindow(that, point.lnglat, point.businessData)
+        })
+      })
 
       !that.isNeedToCallPlanning && window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
-        that.drawRouteFromPath(that, that.currentWaybillTrailLngLats[0].points, SimpleMarker, 'solid')
+        // that.drawRouteFromPath(that, that.currentWaybillTrailLngLats[0].points, SimpleMarker, 'solid')
         // 对于已送达的情况，绘制起止点图钉
         const startMarker = that.getCurrentStartMarker(that, SimpleMarker)
         const endMarker = that.getCurrentEndMarker(that, that.currentWaybillTrailLngLats[0].points, SimpleMarker)
@@ -436,16 +455,16 @@ export default {
     getFormatValue (fieldValue) {
       return fieldValue || ''
     },
-    getMarkerLabelContent (contentType, isCurrent, businessDataExternal, isNeedGetBusinessInfo) {
+    getMarkerLabelContent (context, contentType, isCurrent, businessDataExternal, isNeedGetBusinessInfo) {
       const businessData = isNeedGetBusinessInfo ? businessDataExternal.businessInfo : businessDataExternal
       const currentClass = isCurrent ? 'labelCommon current' : 'labelCommon'
       switch (contentType) {
         case 1:
-          return `<div class='${currentClass}'><span>提货地址：${this.getFormatValue(businessData.sdAddress || businessData.detailAddress)}</span><br><span>要求提货时间：${this.getFormatValue(businessData.pickupTime)}</span><br><span>实际提货时间：${this.getFormatValue(businessData.actualPickupTime)}</span></div>`
+          return `<div id='${JSON.stringify(businessDataExternal)}' class='${currentClass}'><span>提货地址：${this.getFormatValue(businessData.sdAddress || businessData.detailAddress)}</span><br><span>要求提货时间：${this.getFormatValue(businessData.pickupTime)}</span><br><span>实际提货时间：${this.getFormatValue(businessData.actualPickupTime)}</span></div>`
         case 2:
-          return `<div class='${currentClass}'><span>在途位置：${this.getFormatValue(businessData.detailAddress)}</span><br><span>提交人：${this.getFormatValue(businessData.createAccountName)}</span><br><span>提交时间：${this.getFormatValue(businessData.createDate)}</span><br><span>提交来源：${this.getFormatValue(businessData.sourceTypeName)}</span></div>`
+          return `<div id='${JSON.stringify(businessDataExternal)}'  class='${currentClass}'><span>在途位置：${this.getFormatValue(businessData.detailAddress)}</span><br><span>提交人：${this.getFormatValue(businessData.createAccountName)}</span><br><span>提交时间：${this.getFormatValue(businessData.createDate)}</span><br><span>提交来源：${this.getFormatValue(businessData.sourceTypeName)}</span></div>`
         case 3:
-          return `<div class='${currentClass}'><span>送达地址：${this.getFormatValue(businessData.rvAddress || businessData.detailAddress)}</span><br><span>要求送达时间：${this.getFormatValue(businessData.arrivalTime)}</span><br><span>实际送达时间：${this.getFormatValue(businessData.actualArriveDateTime)}</span></div>`
+          return `<div id='${JSON.stringify(businessDataExternal)}'  class='${currentClass}'><span>送达地址：${this.getFormatValue(businessData.rvAddress || businessData.detailAddress)}</span><br><span>要求送达时间：${this.getFormatValue(businessData.arrivalTime)}</span><br><span>实际送达时间：${this.getFormatValue(businessData.actualArriveDateTime)}</span></div>`
         default:
           alert('非法的内容类型！')
       }
@@ -454,7 +473,11 @@ export default {
       const startPointLocation = context.currentWaybillTrailLngLats[0].points[0]
       const startPointBusinessData = startPointLocation.businessData
       const startMarker = new SimpleMarker(context.getMarkerOptions(context, startPointLocation.lnglat, 1, startPointBusinessData.isTransitForLongLatLocation, startPointBusinessData.isOperationToDelay, startPointBusinessData.isOperationDelayed))
-      startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(1, true, startPointBusinessData, true)))
+      startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 1, true, startPointBusinessData, true)))
+      startMarker.on('click', (e) => {
+        console.log('e515', e)
+        context.$message.warning('你点我干嘛：）')
+      })
       return startMarker
     },
     getCurrentEndMarker (context, path, SimpleMarker) {
@@ -470,7 +493,7 @@ export default {
       console.log('endPointLocation515', endPointLocation)
       const endPointBusinessData = point && point.businessData
       const endMarker = endPointBusinessData && new SimpleMarker(context.getMarkerOptions(context, endPointLocation, 3, endPointBusinessData.isTransitForLongLatLocation, endPointBusinessData.isOperationToDelay, endPointBusinessData.isOperationDelayed))
-      endMarker && endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(3, true, endPointBusinessData, true)))
+      endMarker && endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 3, true, endPointBusinessData, true)))
       return endMarker
     },
     drawRoute (route) {
@@ -482,17 +505,8 @@ export default {
       })
     },
     drawRouteFromPath (context, path, SimpleMarker, strokeStyle) {
-      // const startPointLocation = that.currentWaybillTrailLngLats[0].points[0]
-      // const startPointBusinessData = startPointLocation.businessData
-      // const startMarker = new SimpleMarker(that.getMarkerOptions(that, startPointLocation.lnglat, 1, startPointBusinessData.isTransitForLongLatLocation, startPointBusinessData.isOperationToDelay, startPointBusinessData.isOperationDelayed))
-      // startMarker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(1, true, startPointBusinessData.businessInfo)))
       const startMarker = context.getCurrentStartMarker(context, SimpleMarker)
       const endMarker = context.getCurrentEndMarker(context, path, SimpleMarker)
-      // const endMarker = new SimpleMarker(that.getMarkerOptions(that, path[path.length - 1], 3, true, false, true))
-      // endMarker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(3, true, {})))
-      // that.displayInfoWindow(that, endMarker)
-      // const middleMarker = new window.AMap.Marker(that.getMarkerOptions(that, [101.135432, 42.930601], 2, false, false, false))
-      // that.displayInfoWindow(that, middleMarker)
       const routeLine = new window.AMap.Polyline(context.polyLineOptions(path, strokeStyle))
       routeLine.setMap(context.map)
       // 调整视野达到最佳显示区域
