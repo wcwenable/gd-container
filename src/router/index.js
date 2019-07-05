@@ -17,6 +17,11 @@ export default new VueRouter({
       component: () => import('@/views/demo/HelloAMap')
     },
     {
+      path: '/testml',
+      name: 'testml',
+      component: () => import('@/views/demo/TestMarkerList')
+    },
+    {
       path: '/otwTrackMap',
       name: 'otwTrackMap',
       component: () => import('@/components/OnTheWayTrackMap')

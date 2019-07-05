@@ -17,6 +17,9 @@
       </a>
       <el-button @click="handleEraseOverlays">清除地图覆盖物</el-button>
     </div>
+    <div id="panel" hidden>
+      <ul id="my-list"></ul>
+    </div>
   </div>
 </template>
 
@@ -29,70 +32,14 @@ export default {
       default: () => {
         return null
       }
-    },
-    dispatchWaybillId: {
-      type: String,
-      default: null
     }
   },
   data () {
     return {
       map: null,
       pathSimplifierIns: null,
-      currentDispatchedWaybillId: this.dispatchWaybillId,
-      currentDispatch: this.dispatchBusinessEntity,
-      currentWaybillTrailLngLats: [
-        // {
-        //   name: '已走线路',
-        //   points: [{
-        //     name: '点a<br>515',
-        //     businessData: {
-        //       'wcw': 515
-        //     },
-        //     lnglat: [116.405289, 39.904987]
-        //   }, {
-        //     name: '点b',
-        //     lnglat: [113.964458, 40.54664]
-        //   }, {
-        //     name: '点c',
-        //     lnglat: [111.47836, 41.135964]
-        //   }, {
-        //     name: '点d',
-        //     lnglat: [108.949297, 41.670904]
-        //   }, {
-        //     name: '点e',
-        //     lnglat: [106.380111, 42.149509]
-        //   }, {
-        //     name: '点f',
-        //     lnglat: [103.774185, 45.56996]
-        //   }, {
-        //     name: '点g',
-        //     lnglat: [101.135432, 42.930601]
-        //   }, {
-        //     name: '点h',
-        //     lnglat: [98.46826, 43.229964]
-        //   }, {
-        //     name: '点i',
-        //     lnglat: [95.777529, 43.466798]
-        //   }, {
-        //     name: '点j',
-        //     lnglat: [93.068486, 43.64009]
-        //   }, {
-        //     name: '点k',
-        //     lnglat: [90.34669, 43.749086]
-        //   }]
-        // },
-        // {
-        //   name: '未走路线',
-        //   points: [{
-        //     name: '点k',
-        //     lnglat: [90.34669, 43.749086]
-        //   }, {
-        //     name: '点l<br>515',
-        //     lnglat: [87.61792, 44.793308]
-        //   }]
-        // }
-      ],
+      currentDispatch: null,
+      currentWaybillTrailLngLats: [],
       renderOptions: {
         renderAllPointsIfNumberBelow: 100, // 绘制路线节点，如不需要可设置为-1
         keyPointTolerance: 0,
@@ -127,6 +74,9 @@ export default {
       }
     }
   },
+  created () {
+    this.currentDispatch = JSON.parse(JSON.stringify(this.dispatchBusinessEntity))
+  },
   computed: {
     isExistCurrentNode () {
       return !!this.currentDispatchedWaybillId
@@ -139,65 +89,73 @@ export default {
     },
     isExistCurrentDispatch () {
       return !!this.currentDispatch
+    },
+    currentDispatchedWaybillId () {
+      return !!this.currentDispatch && this.currentDispatch.currentDispatchedWaybillId
     }
   },
   mounted () {
-    this.initProcess()
+    this.initProcess(this)
   },
   watch: {
     // 处理调度单改变事件
     dispatchBusinessEntity (newVal) {
-      console.log('dispatchBusinessEntity515', newVal)
-      this.currentDispatch = newVal
-      this.handleCurrentDispatchChange()
-    },
-    // 处理调度运单改变事件
-    dispatchWaybillId (newVal) {
-      console.log('dispatchWaybillId515', newVal)
-      this.currentDispatchedWaybillId = newVal
-      // this.handleDispatchWaybillChange()
-      !this.isExistCurrentNode && this.initProcess()
+      this.handleDispatchChangeExternal(this, newVal)
     }
   },
   methods: {
-    handleCurrentDispatchChange () {
-      this.handleEraseOverlays()
-      const oldCurrentDispatchWaybillId = this.currentDispatchedWaybillId
-      if (this.isExistCurrentDispatch) {
-        const bRet = this.batchAddMarkers(this, this.currentDispatch.dispatchedWaybills, oldCurrentDispatchWaybillId, (context, waybillBusinessEntity, SimpleMarker) => {
+    handleDispatchChangeExternal (context, newVal, isAlwaysUpdate) {
+      const that = context
+      console.log('dispatchBusinessEntity515', newVal, that.currentDispatch)
+      if (!newVal) {
+        that.handleEraseOverlays()
+        const oldCurrentDispatchWaybillId = that.currentDispatchedWaybillId
+        that.$http.get('/api/track/getAllWaybillLocations').then((res) => {
+          console.log('getAllWaybillLocations》res515', res)
+          const locations = res.body.data.locations
+          !that.isExistCurrentDispatch && that.batchAddMarkers(that, locations, oldCurrentDispatchWaybillId, (context, locationBusinessEntity, SimpleMarker) => {
+            const marker = new SimpleMarker(context.getMarkerOptions(context, locationBusinessEntity.longLatLocation, locationBusinessEntity.locationType, locationBusinessEntity.isTransitForLongLatLocation, locationBusinessEntity.isOperationToDelay, locationBusinessEntity.isOperationDelayed))
+            // marker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(locationBusinessEntity.locationType, false, locationBusinessEntity)))
+            return [marker]
+          })
+        }, (err) => {
+          console.log('err515', err)
+        })
+      }
+      // 2. 赋值
+      that.currentDispatch = JSON.parse(JSON.stringify(newVal))
+      // 3. （根据变化情况，具体情况具体分析地）处理
+      that.initProcess(that)
+    },
+    handleCurrentDispatchChange (context) {
+      const that = context
+      that.handleEraseOverlays()
+      const oldCurrentDispatchWaybillId = that.currentDispatchedWaybillId
+      if (that.isExistCurrentDispatch) {
+        const dispatchedWaybills = that.currentDispatch.dispatchedWaybills
+        console.log('dispatchedWaybills515', that.currentDispatch.dispatchedWaybills)
+        const bRet = dispatchedWaybills && that.batchAddMarkers(that, dispatchedWaybills, oldCurrentDispatchWaybillId, (context, waybillBusinessEntity, SimpleMarker) => {
           if (context.currentDispatchedWaybillId && context.currentDispatchedWaybillId === waybillBusinessEntity.dispatchWaybillId) {
             return []
           }
           const startMarker = new SimpleMarker(context.getMarkerOptions(context, waybillBusinessEntity.startLocation, 1, waybillBusinessEntity.isTransitForStartLocation, waybillBusinessEntity.isDeliveryToDelay, waybillBusinessEntity.isDeliveryDelayed))
           startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 1, false, waybillBusinessEntity)))
+          context.addSelectEventListener(context, startMarker, waybillBusinessEntity, true)
           const endMarker = new SimpleMarker(context.getMarkerOptions(context, waybillBusinessEntity.endLocation, 3, waybillBusinessEntity.isTransitForEndLocation, waybillBusinessEntity.isArriveToDelay, waybillBusinessEntity.isArriveDelayed))
           endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 3, false, waybillBusinessEntity)))
+          context.addSelectEventListener(context, endMarker, waybillBusinessEntity)
           return [startMarker, endMarker]
         })
         bRet && this.initProcess()
-        // !bRet && this.handleCurrentDispatchChange()
       }
-      const that = this
-      !this.isExistCurrentDispatch && this.$http.get('/api/track/getAllWaybillLocations').then((res) => {
-        console.log('getAllWaybillLocations》res515', res)
-        const locations = res.body.data.locations
-        const oldCurrentDispatchWaybillId = this.currentDispatchedWaybillId
-        !that.isExistCurrentDispatch && that.batchAddMarkers(that, locations, oldCurrentDispatchWaybillId, (context, locationBusinessEntity, SimpleMarker) => {
-          const marker = new SimpleMarker(context.getMarkerOptions(context, locationBusinessEntity.longLatLocation, locationBusinessEntity.locationType, locationBusinessEntity.isTransitForLongLatLocation, locationBusinessEntity.isOperationToDelay, locationBusinessEntity.isOperationDelayed))
-          // marker.setLabel(that.getMarkerLabelOptions(that.getMarkerLabelContent(locationBusinessEntity.locationType, false, locationBusinessEntity)))
-          return [marker]
-        })
-      }, (err) => {
-        console.log('err515', err)
-      })
     },
-    handleDispatchWaybillChange () {
-      this.handleEraseOverlays()
-      this.isExistCurrentNode && this.$http.get('/api/track/getLocationsByDispatchWaybillId').then((res) => {
+    handleDispatchWaybillChange (context) {
+      const that = context
+      that.handleEraseOverlays(that)
+      that.isExistCurrentNode && that.$http.get('/api/track/getLocationsByDispatchWaybillId').then((res) => {
         console.log('getLocationsByDispatchWaybillId》res515', res)
         const resData = res.body.data
         this.currentWaybillTrailLngLats = []
-
         // 求currentWaybillTrailLngLats的值
         const locations = resData && resData.locations
         if (locations && locations.length > 1) {
@@ -210,12 +168,10 @@ export default {
                 businessData: locationBusinessEntity
               })
             })
-            this.currentWaybillTrailLngLats.push(
-              {
-                name: '已走线路',
-                points: walkedRoadLinePoints
-              }
-            )
+            this.currentWaybillTrailLngLats.push({
+              name: '已走线路',
+              points: walkedRoadLinePoints
+            })
           } else {
             const walkedRoadLinePoints = []
             const toWalkRoadLinePoints = []
@@ -225,7 +181,6 @@ export default {
                 lnglat: locationBusinessEntity.longLatLocation,
                 businessData: locationBusinessEntity
               })
-
               if ((index === locations.length - 2) || (index === locations.length - 1)) {
                 toWalkRoadLinePoints.push({
                   name: locationBusinessEntity.businessInfo.detailAddress,
@@ -234,18 +189,14 @@ export default {
                 })
               }
             })
-            this.currentWaybillTrailLngLats.push(
-              {
-                name: '已走线路',
-                points: walkedRoadLinePoints
-              }
-            )
-            this.currentWaybillTrailLngLats.push(
-              {
-                name: '未走线路',
-                points: toWalkRoadLinePoints
-              }
-            )
+            this.currentWaybillTrailLngLats.push({
+              name: '已走线路',
+              points: walkedRoadLinePoints
+            })
+            this.currentWaybillTrailLngLats.push({
+              name: '未走线路',
+              points: toWalkRoadLinePoints
+            })
           }
         }
         console.log('this.currentWaybillTrailLngLats515', this.currentWaybillTrailLngLats)
@@ -261,7 +212,6 @@ export default {
         for (let locationBusinessEntity of businessEntityList) {
           const retMarkers = processFn(context, locationBusinessEntity, SimpleMarker)
           markers = [...markers, ...retMarkers]
-
           // 中途检查到当前调度运单发生变化
           if (oldCurrentDispatchWaybillId !== context.currentDispatchedWaybillId) {
             context.isExistCurrentNode && context.initProcess()
@@ -275,17 +225,16 @@ export default {
         }
         // 调整视野达到最佳显示区域
         context.map.setFitView(markers)
-
         return true
       })
     },
-    initProcess () {
+    initProcess (that) {
       // 创建地图
-      this.map = this.map || new window.AMap.Map('container', {
+      that.map = that.map || new window.AMap.Map('container', {
         zoom: 4
       })
-      this.handleCurrentDispatchChange()
-      this.handleDispatchWaybillChange()
+      that.handleCurrentDispatchChange(that)
+      that.handleDispatchWaybillChange(that)
     },
     handleAddNode () {
       this.$message.warning('添加节点逻辑here!')
@@ -390,7 +339,6 @@ export default {
           that.displayInfoWindow(that, point.lnglat, point.businessData)
         })
       })
-
       !that.isNeedToCallPlanning && window.AMapUI.loadUI(['overlay/SimpleMarker'], function (SimpleMarker) {
         // that.drawRouteFromPath(that, that.currentWaybillTrailLngLats[0].points, SimpleMarker, 'solid')
         // 对于已送达的情况，绘制起止点图钉
@@ -474,11 +422,58 @@ export default {
       const startPointBusinessData = startPointLocation.businessData
       const startMarker = new SimpleMarker(context.getMarkerOptions(context, startPointLocation.lnglat, 1, startPointBusinessData.isTransitForLongLatLocation, startPointBusinessData.isOperationToDelay, startPointBusinessData.isOperationDelayed))
       startMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 1, true, startPointBusinessData, true)))
-      startMarker.on('click', (e) => {
-        console.log('e515', e)
-        context.$message.warning('你点我干嘛：）')
-      })
+      // context.addSelectEventListener(context, startMarker, startPointBusinessData)
       return startMarker
+    },
+    addSelectEventListener (context, targetMarker, businessData, isStart) {
+      window.AMapUI.loadUI(['misc/MarkerList'],
+        function (MarkerList) {
+          var markerList = new MarkerList({
+            // 关联的map对象
+            map: context.map,
+            // 列表的dom容器的id
+            listContainer: 'my-list',
+            // 置空默认的选中行为，后续监听selectedChanged中处理
+            onSelected: null,
+            // 返回数据项的Id
+            getDataId: function (dataItem, index) {
+              // index表示该数据项在数组中的索引位置，从0开始，如果确实没有id，可以返回index代替
+              return JSON.stringify(dataItem)
+            },
+            // 返回数据项的位置信息，需要是AMap.LngLat实例，或者是经纬度数组，比如[116.789806, 39.904989]
+            getPosition: function (dataItem) {
+              // console.log('dataItem515', dataItem)
+              return isStart ? dataItem.startLocation : dataItem.endLocation
+            },
+            // 返回数据项对应的Marker
+            getMarker: function (dataItem, context, recycledMarker) {
+              console.log('getMarker>dataItem515')
+              return targetMarker
+            }
+          })
+          // 监听选中改变
+          markerList.on('selectedChanged', function (event, changedInfo) {
+            // 重复选中，取消当前选中
+            if (changedInfo.selectAgain) {
+              this.clearSelected()
+              return
+            }
+            var selectedRecord = changedInfo.selected
+            // var selectedRecord = changedInfo.selected
+            console.log('selectedRecord515', selectedRecord)
+            if (selectedRecord) {
+              const newDispatch = JSON.parse(JSON.stringify(context.currentDispatch))
+              newDispatch.currentDispatchedWaybillId = selectedRecord.data.dispatchedWaybillId
+              console.log('selectedRecord.data.dispatchedWaybillId515', selectedRecord.data.dispatchedWaybillId)
+              console.log('context.currentDispatch.currentDispatchedWaybillIdd515', context.currentDispatch.currentDispatchedWaybillId)
+              context.handleDispatchChangeExternal(context, newDispatch, selectedRecord.data.dispatchedWaybillId === context.currentDispatch.currentDispatchedWaybillId)
+            }
+          })
+          // 构建一个数据项数组，数据项本身没有格式要求，但需要支持下述的getDataId和getPosition
+          var data = [businessData]
+          // 展示该数据
+          markerList.render(data)
+        })
     },
     getCurrentEndMarker (context, path, SimpleMarker) {
       let points = []
@@ -494,6 +489,7 @@ export default {
       const endPointBusinessData = point && point.businessData
       const endMarker = endPointBusinessData && new SimpleMarker(context.getMarkerOptions(context, endPointLocation, 3, endPointBusinessData.isTransitForLongLatLocation, endPointBusinessData.isOperationToDelay, endPointBusinessData.isOperationDelayed))
       endMarker && endMarker.setLabel(context.getMarkerLabelOptions(context.getMarkerLabelContent(context, 3, true, endPointBusinessData, true)))
+      // endMarker && context.addSelectEventListener(context, endMarker, endPointBusinessData)
       return endMarker
     },
     drawRoute (route) {
@@ -576,9 +572,9 @@ export default {
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style lang="scss">
   /* * {
-        margin: 0;
-        padding: 0;
-    } */
+          margin: 0;
+          padding: 0;
+      } */
   .body515 {
     position: relative;
     width: 1800px;

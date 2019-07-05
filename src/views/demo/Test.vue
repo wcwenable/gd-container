@@ -2,7 +2,7 @@
     <div>
        <el-button @click="handleBtnClick">换一个</el-button>
        <el-button @click="handleResetBtnClick">清空</el-button>
-       <on-the-way-track-map :dispatchBusinessEntity='currentDispatch' :dispatchWaybillId='currentDispatchedWaybillId'></on-the-way-track-map>
+       <on-the-way-track-map :dispatchBusinessEntity='currentDispatch'></on-the-way-track-map>
     </div>
 </template>
 
@@ -15,8 +15,10 @@ export default {
   },
   data () {
     return {
-      currentDispatchedWaybillId: null,
-      currentDispatch: null
+      // currentDispatchedWaybillId: null,
+      currentDispatch: {
+        currentDispatchedWaybillId: null
+      }
     }
   },
   components: {
@@ -35,16 +37,20 @@ export default {
         console.log('res.body.data515', res.body.data)
         const waybills = this.currentDispatch && this.currentDispatch.dispatchedWaybills
         if (waybills && waybills.length) {
-          this.currentDispatchedWaybillId = waybills[0].dispatchedWaybillId
+          this.currentDispatch.currentDispatchedWaybillId = waybills[0].dispatchedWaybillId
         }
-        console.log('this.currentDispatchedWaybillId515', this.currentDispatchedWaybillId)
+        console.log('this.currentDispatch515', this.currentDispatch)
       }, (err) => {
         console.log('getTrackDeliveryList》err515', err)
       })
     },
     handleResetBtnClick () {
-      // this.currentDispatch = null
-      this.currentDispatchedWaybillId = null
+      const dispatchedWaybills = this.currentDispatch.dispatchedWaybills
+      const randomIndex = Math.round(Math.random() * dispatchedWaybills.length)
+      console.log('Math.random(dispatchedWaybills.length)515', randomIndex, dispatchedWaybills)
+      this.currentDispatch.currentDispatchedWaybillId = dispatchedWaybills[randomIndex].dispatchedWaybillId
+      this.currentDispatch = JSON.parse(JSON.stringify(this.currentDispatch))
+      // this.currentDispatchedWaybillId = null
     }
   }
 }
