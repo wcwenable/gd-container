@@ -45,12 +45,19 @@ export default {
       })
     },
     handleResetBtnClick () {
-      const dispatchedWaybills = this.currentDispatch.dispatchedWaybills
-      const randomIndex = Math.round(Math.random() * dispatchedWaybills.length)
-      console.log('Math.random(dispatchedWaybills.length)515', randomIndex, dispatchedWaybills)
-      this.currentDispatch.currentDispatchedWaybillId = dispatchedWaybills[randomIndex].dispatchedWaybillId
+      // 测试 当前选中调度单的情况
+      // const dispatchedWaybills = this.currentDispatch.dispatchedWaybills
+      // const randomIndex = Math.round(Math.random() * dispatchedWaybills.length)
+      // console.log('Math.random(dispatchedWaybills.length)515', randomIndex, dispatchedWaybills)
+      // this.currentDispatch.currentDispatchedWaybillId = dispatchedWaybills[randomIndex].dispatchedWaybillId
+      // this.currentDispatch = JSON.parse(JSON.stringify(this.currentDispatch))
+
+      // 测试 只选中调度单没有选中调度运单的情况
+      this.currentDispatch.currentDispatchedWaybillId = null
       this.currentDispatch = JSON.parse(JSON.stringify(this.currentDispatch))
-      // this.currentDispatchedWaybillId = null
+
+      // 测试 当前没有选中调度单或调度运单 的情况
+      // this.currentDispatch = null
     }
   }
 }
